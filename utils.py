@@ -2,25 +2,30 @@ import cv2
 import numpy as np
 import math
 
-RATE = .85
+SMALL_RATE = .5
+BIG_RATE = .95
 INTERVAL_SIZE = 180
 INTERVAL = (2*math.pi)/INTERVAL_SIZE
 
 
-def get_shapes(img_gray, show = False):
+def color_mask(mask, orientation):
+    return np.dstack((
+        np.where(mask, orientation, 0),
+        np.where(mask, orientation, 0),
+        np.where(mask, orientation, 255)
+    ))   # stacks 3 h x w arrays -> h x w x 3
+
+
+def get_shapes(img_gray, show = False, is_small_rate = True):
     x ,y = np.gradient(img_gray)
     orientation = np.arctan2(y, x)
     norm = np.hypot(y, x)
-
-    threshold = np.quantile(norm, q=RATE)
+    rate = SMALL_RATE if is_small_rate else BIG_RATE
+    threshold = np.quantile(norm, q=rate)
     mask = np.where(norm > threshold, 1, 0)
 
     if show:
-        mask_ = np.dstack((
-            np.where(mask, orientation, 0),
-            np.where(mask, orientation, 0),
-            np.where(mask, orientation, 255)
-        ))  # stacks 3 h x w arrays -> h x w x 3
+        mask_ = color_mask (mask, orientation) 
     else:
         mask_ = mask
 

@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import numpy as np
-from utils import get_shapes, get_rtable
+from utils import get_shapes, get_rtable, get_interval_number, color_mask
 
 roi_defined = False
  
@@ -60,7 +60,13 @@ hsv_roi =  cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
 rtable = get_rtable(hsv_roi, (r, c), (r+h//2, c+w//2))
 
-
+# computation mask of the histogram:
+# Pixels with S<30, V<20 or V>235 are ignored 
+mask = cv2.inRange(hsv_roi, np.array((0.,30.,20.)), np.array((180.,255.,235.)))
+# Marginal histogram of the Hue component
+roi_hist = cv2.calcHist([hsv_roi],[0],mask,[180],[0,180])
+# Histogram values are normalised to [0,255]
+cv2.normalize(roi_hist,roi_hist,0,255,cv2.NORM_MINMAX)
 
 # Setup the termination criteria: either 10 iterations,
 # or move by less than 1 pixel
@@ -74,13 +80,32 @@ while(1):
         # Backproject the model histogram roi_hist onto the 
         # current image hsv, i.e. dst(x,y) = roi_hist(hsv(0,x,y))
         dst = cv2.calcBackProject([hsv],[0],roi_hist,[0,180],1)
-        orientation, norm, mask = get_shapes(gray)
+        
+        orientation, norm, mask = get_shapes(hsv[:,:,2], False, True)
 
+        matrix_th = np.zeros(shape=hsv.shape[:2])
+        
+        for y in range(hsv.shape[0]):
+            for x in range(hsv.shape[1]):
+                if mask[y, x]:
+                    line = rtable[get_interval_number(orientation[y,x])]
+                    for (u, v) in line:
+                        try:
+                            matrix_th[y+v, x+u,]+=1
+                        except: 
+                            continue
 
+        
 
         # apply meanshift to dst to get the new location
-        #ret, track_window = cv2.meanShift(dst, track_window, term_crit)
+        # Q5
+        ret, track_window = cv2.meanShift(matrix_th, track_window, term_crit)
 
+
+        # Q4
+        ind = np.unravel_index(np.argmax(matrix_th, axis=None), matrix_th.shape)
+
+        #r,c = ind[1] - h//2, ind[0] - w//2 
         # Draw a blue rectangle on the current image
         r,c,h,w = track_window
         frame_tracked = cv2.rectangle(frame, (r,c), (r+h,c+w), (255,0,0) ,2)
@@ -88,11 +113,11 @@ while(1):
         
         gray = cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)[:,:,2]
 
-        
         cv2.imshow('Sequence',frame_tracked)
         cv2.imshow('Orientation', orientation)
         cv2.imshow('Norm', norm / norm.max().max())
-        cv2.imshow('Mask', mask.astype(float))
+        cv2.imshow('Mask', color_mask(mask, orientation).astype(float))
+        cv2.imshow('Hough Transform', matrix_th / matrix_th.max().max())
 
         k = cv2.waitKey(60) & 0xff
         if k == 27:
