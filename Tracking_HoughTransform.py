@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+import numpy as np
+from utils import get_shapes
 
 roi_defined = False
  
@@ -19,6 +21,10 @@ def define_ROI(event, x, y, flags, param):
 		r = min(r,r2)
 		c = min(c,c2)  
 		roi_defined = True
+
+
+
+
 
 cap = cv2.VideoCapture('./Sequences/Antoine_Mug.mp4')
 
@@ -68,8 +74,8 @@ while(1):
     ret ,frame = cap.read()
     if ret == True:
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-	# Backproject the model histogram roi_hist onto the 
-	# current image hsv, i.e. dst(x,y) = roi_hist(hsv(0,x,y))
+        # Backproject the model histogram roi_hist onto the 
+        # current image hsv, i.e. dst(x,y) = roi_hist(hsv(0,x,y))
         dst = cv2.calcBackProject([hsv],[0],roi_hist,[0,180],1)
 
         # apply meanshift to dst to get the new location
@@ -78,8 +84,17 @@ while(1):
         # Draw a blue rectangle on the current image
         r,c,h,w = track_window
         frame_tracked = cv2.rectangle(frame, (r,c), (r+h,c+w), (255,0,0) ,2)
-        cv2.imshow('Sequence',frame_tracked)
 
+        
+        gray = cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)[:,:,2]
+
+        orientation, norm, mask = get_shapes(gray)
+        
+        cv2.imshow('Sequence',frame_tracked)
+        cv2.imshow('Orientation', orientation)
+        cv2.imshow('Norm', norm / norm.max().max())
+        cv2.imshow('Mask', mask.astype(float))
+        
         k = cv2.waitKey(60) & 0xff
         if k == 27:
             break
